@@ -1,7 +1,6 @@
 import csv
 
 # Definición de nombres de atributos y clases
-# Los atributos representan las preferencias y las clases representan la nacionalidad
 ATRIBUTOS = ['scones', 'cerveza', 'whisky', 'avena', 'futbol']
 CLASES = {'I': 'Inglesa', 'E': 'Escocesa'}
 
@@ -36,40 +35,57 @@ def calcular_probabilidades(datos):
 
     return prob_clases, probabilidades
 
-# Función para clasificar un nuevo ejemplo basado en las probabilidades calculadas
-def clasificar(ejemplo, prob_clases, probabilidades):
-    mejor_clase = None
-    mejor_probabilidad = -1
+# Función para clasificar un nuevo ejemplo con normalización de probabilidades
+def clasificar_con_normalizacion(ejemplo, prob_clases, probabilidades):
+    probabilidades_conjuntas = {}  # Para almacenar las probabilidades conjuntas de cada clase
+    probabilidad_evidencia = 0  # Para almacenar la suma de las probabilidades conjuntas (P(evidencia))
 
-    # Calcular la probabilidad para cada clase dada el ejemplo
+    # Calcular la probabilidad conjunta para cada clase dada el ejemplo
     for clase in prob_clases:
-        probabilidad = prob_clases[clase]  # Iniciar con la probabilidad a priori de la clase
+        probabilidad_conjunta = prob_clases[clase]  # Iniciar con la probabilidad a priori de la clase
         for i, valor in enumerate(ejemplo):
-            probabilidad *= probabilidades[(clase, i, valor)]  # Multiplicar por la probabilidad condicional
-        # Comparar con la mejor probabilidad encontrada hasta ahora
-        if probabilidad > mejor_probabilidad:
-            mejor_probabilidad = probabilidad
-            mejor_clase = clase
+            probabilidad_conjunta *= probabilidades[(clase, i, valor)]  # Multiplicar por la probabilidad condicional
+        probabilidades_conjuntas[clase] = probabilidad_conjunta  # Guardar la probabilidad conjunta
+        probabilidad_evidencia += probabilidad_conjunta  # Sumar para la probabilidad de la evidencia
 
-    return mejor_clase, mejor_probabilidad
+    # Normalizar las probabilidades conjuntas para que sumen 1 (probabilidad posterior)
+    probabilidades_posteriores = {clase: prob_conjunta / probabilidad_evidencia for clase, prob_conjunta in probabilidades_conjuntas.items()}
 
-# Función para mostrar un cálculo detallado de la clasificación
-def mostrar_calculo_detallado(ejemplo, prob_clases, probabilidades):
+    # Encontrar la clase con la mayor probabilidad posterior
+    mejor_clase = max(probabilidades_posteriores, key=probabilidades_posteriores.get)
+    mejor_probabilidad = probabilidades_posteriores[mejor_clase]
+
+    return mejor_clase, mejor_probabilidad, probabilidades_posteriores
+
+# Función para mostrar un cálculo detallado de la clasificación con normalización
+def mostrar_calculo_detallado_con_normalizacion(ejemplo, prob_clases, probabilidades):
     print("## Cálculo detallado para el ejemplo:")
     for i, valor in enumerate(ejemplo):
         print(f"  {ATRIBUTOS[i]}: {'Sí' if valor == 1 else 'No'}")
 
+    probabilidades_conjuntas = {}
+    probabilidad_evidencia = 0
+
     for clase, nombre_clase in CLASES.items():
-        probabilidad = prob_clases[clase]
+        probabilidad_conjunta = prob_clases[clase]
         print(f"\nPara la nacionalidad {nombre_clase}:")
-        print(f"P({nombre_clase}) = {probabilidad:.6f}")
+        print(f"P({nombre_clase}) = {probabilidad_conjunta:.6f}")
 
         for i, valor in enumerate(ejemplo):
             p = probabilidades[(clase, i, valor)]
             print(f"P({ATRIBUTOS[i]}={'Sí' if valor == 1 else 'No'} | {nombre_clase}) = {p:.6f}")
-            probabilidad *= p
+            probabilidad_conjunta *= p
 
-        print(f"Probabilidad final para {nombre_clase}: {probabilidad:.6f}")
+        probabilidades_conjuntas[clase] = probabilidad_conjunta
+        probabilidad_evidencia += probabilidad_conjunta
+        print(f"Probabilidad conjunta para {nombre_clase}: {probabilidad_conjunta:.6f}")
+
+    print(f"\nProbabilidad de la evidencia (P(evidencia)): {probabilidad_evidencia:.6f}")
+
+    probabilidades_posteriores = {clase: prob_conjunta / probabilidad_evidencia for clase, prob_conjunta in probabilidades_conjuntas.items()}
+
+    for clase, prob_posterior in probabilidades_posteriores.items():
+        print(f"Probabilidad posterior para {CLASES[clase]}: {prob_posterior:.6f}")
 
 # Cargar los datos desde el archivo CSV
 datos = cargar_datos('PreferenciasBritanicos.csv')
@@ -82,14 +98,16 @@ x1 = [1, 0, 1, 1, 0]  # Ejemplo 1
 x2 = [0, 1, 1, 0, 1]  # Ejemplo 2
 
 # Clasificar y mostrar detalles para el primer ejemplo
-print("# Clasificación de ejemplos")
+print("# Clasificación de ejemplos con normalización")
 print("\n## Ejemplo x1:")
-mostrar_calculo_detallado(x1, prob_clases, probabilidades)
-clase_x1, prob_x1 = clasificar(x1, prob_clases, probabilidades)
+mostrar_calculo_detallado_con_normalizacion(x1, prob_clases, probabilidades)
+clase_x1, prob_x1, probabilidades_x1 = clasificar_con_normalizacion(x1, prob_clases, probabilidades)
 print(f"\nClasificación final para x1: {CLASES[clase_x1]} con probabilidad {prob_x1:.6f}")
+print(f"Probabilidades finales: {probabilidades_x1}")
 
 # Clasificar y mostrar detalles para el segundo ejemplo
 print("\n## Ejemplo x2:")
-mostrar_calculo_detallado(x2, prob_clases, probabilidades)
-clase_x2, prob_x2 = clasificar(x2, prob_clases, probabilidades)
+mostrar_calculo_detallado_con_normalizacion(x2, prob_clases, probabilidades)
+clase_x2, prob_x2, probabilidades_x2 = clasificar_con_normalizacion(x2, prob_clases, probabilidades)
 print(f"\nClasificación final para x2: {CLASES[clase_x2]} con probabilidad {prob_x2:.6f}")
+print(f"Probabilidades finales: {probabilidades_x2}")
