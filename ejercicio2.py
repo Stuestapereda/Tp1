@@ -33,7 +33,6 @@ entrenamiento, prueba = train_test_split(df_filtrado, test_size=0.3, random_stat
 # Cargar las stopwords en español
 stop_words = set(stopwords.words('spanish'))
 
-
 palabra_clave={}
 for i,categoria in enumerate(categorias_seleccionadas):
     df_cat_1=entrenamiento[entrenamiento["categoria"]==categoria]

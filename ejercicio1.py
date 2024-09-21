@@ -1,5 +1,4 @@
 import csv
-import numpy as np
 
 def Extraer_data(data):
     BD_1=[] #lista para calcular la probabilidad a priori y la evidencia
@@ -81,7 +80,7 @@ def clasificar(lista,evidencia, priori, verosimilitud):
         else:
             prob_evi*=(1-evidencia[i])
 
-    
+
     prob_ver= [1 for e in range(len(priori))]
     #Calculo de probabilidad de verosimilitud
     for i  in range(len(prob_ver)):
@@ -96,11 +95,12 @@ def clasificar(lista,evidencia, priori, verosimilitud):
     for i in range(len(clases)):
         if prob_evi != 0:
             clases[i] = (prob_ver[i] * priori[i]) / prob_evi
+            print(f"clases:{i+1} = ({prob_ver[i]} * {priori[i]}) / {prob_evi}")
         else:
             clases[i] = 0  # O algún valor que refleje el escenario
 
     
-    print(sum(clases))
+    print(clases)
 
     if clases[0]>clases[1]:
         prob=clases[0]
@@ -134,6 +134,7 @@ for i,p in enumerate(priori):
 for i,clase in enumerate(verosimilitud):
     for e,atributo in enumerate(clase):
         print(f"Clase_{i+1}_atributo_{e+1}: {verosimilitud[i][e]}")
+
 
 p,n = clasificar([1,0,1,1,0],evidencia, priori, verosimilitud)
 print(f"La probliadad de que la nacionalidad sea {n} es de {p*100}%")
