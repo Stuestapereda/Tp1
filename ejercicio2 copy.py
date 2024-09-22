@@ -5,7 +5,9 @@ import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 from collections import Counter
+from nltk.tokenize import word_tokenize
 import matplotlib.pyplot as plt
+nltk.download('punkt_tab')
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_curve, auc
 from sklearn.preprocessing import label_binarize
 
@@ -36,26 +38,24 @@ palabra_clave={}
 for i,categoria in enumerate(categorias_seleccionadas):
     df_cat_1=entrenamiento[entrenamiento["categoria"]==categoria]
     todos_los_titulares = " ".join(df_cat_1['titular'])
-    texto_min=todos_los_titulares.lower()
-    palabras = texto_min.split()
-    palabras_filtradas = [palabra for palabra in palabras if palabra not in stop_words and len(palabra) > 1]
+
+    # Tokenizar y filtrar palabras
+    palabras = word_tokenize(todos_los_titulares.lower())
+    palabras_filtradas = [palabra for palabra in palabras if palabra.isalpha() and palabra not in stop_words]
+    
 
     # Contar las palabras más comunes
     contador_palabras = Counter(palabras_filtradas)
 
-    # Obtener las 20 palabras más comunes
-    palabras_comunes = contador_palabras.most_common(50) #300 palabras en total
-    # Mostrar el resultado
-    print(f"categoria:{categoria}")
-    for palabra, frecuencia in palabras_comunes:
-        #print(f'{palabra}: {frecuencia}')
-        palabra_clave[categoria]=dict(palabras_comunes)
+    # Obtener las 50 palabras más comunes
+    palabra_clave[categoria] = dict(contador_palabras.most_common(50))
+
     
 
 #Calculo de probabilidades
 #Aplicar suavisado laplasiano
 todas_palabras={}
-freq=0
+freq=0 #total de palabras
 for categoria in palabra_clave:
     for palabra in palabra_clave[categoria]:
         if palabra not in todas_palabras:
@@ -69,13 +69,14 @@ for word in todas_palabras:
         if word in palabra_clave[categoria]:
             palabra_clave[categoria][word]+=1
         else:
-            palabra_clave[categoria][word]=1
+            palabra_clave[categoria][word]=1 #Para evitar la influencia de palabras no observadas
 
 priori={}
 for i,categoria in enumerate(categorias_seleccionadas):
     df_cat_1=entrenamiento[entrenamiento["categoria"]==categoria]
     priori[categoria]=len(df_cat_1)/len(entrenamiento)
 
+"""
 evidencia={}
 freq=0
 for categoria in palabra_clave:
@@ -88,21 +89,19 @@ for categoria in palabra_clave:
 
 for palabra in evidencia:
     evidencia[palabra]=evidencia[palabra]/freq
+"""
 
 verosimilitud={}
 for categoria in palabra_clave:
-    freq=0
+    total_palabras_categoria = sum(palabra_clave[categoria].values()) 
     cat={}
     for palabra in palabra_clave[categoria]:
-        cat[palabra]=palabra_clave[categoria][palabra]
-        freq+=palabra_clave[categoria][palabra]
-
-    for palabra in palabra_clave[categoria]:
-        cat[palabra]=cat[palabra]/freq
-
+        cat[palabra]=palabra_clave[categoria][palabra]/total_palabras_categoria
     verosimilitud[categoria]=cat
 
+
 #Comprobando
+probabilidades = []
 predicion=[]
 for index, fila in prueba.iterrows():
     titulo = fila['titular'].lower()
@@ -117,16 +116,46 @@ for index, fila in prueba.iterrows():
             if palabra in palabras_filtradas:
                 prob+=np.log(verosimilitud[categoria][palabra])
             else:
-                prob+=np.log(1-verosimilitud[categoria][palabra])
+                continue #Ignoramos las palabras que no estan.
+                #prob+=np.log(1-verosimilitud[categoria][palabra])
 
         prob_cate[categoria]=prob
 
     predic = max(prob_cate, key=prob_cate.get)
     predicion.append(predic)
+    probabilidades.append([prob_cate[cat] for cat in categorias_seleccionadas])
+
+probabilidades = np.array(probabilidades)
 
 # Agregar las predicciones al conjunto de prueba
 prueba['prediccion'] = predicion
 
+"""
+Binarización en un problema multiclase
+En un problema de clasificación multiclase, 
+para calcular la curva ROC para cada clase, 
+debes tratar cada categoría como un problema binario: "¿Esta muestra pertenece a esta categoría o no?".
+
+"""
+binarizado = label_binarize(prueba['categoria'], classes=categorias_seleccionadas)
+
+# Crear la curva ROC para cada categoría
+fpr = {} #false positive    
+tpr = {} #true positive
+roc_auc = {} #area under the curve
+
+plt.figure()
+for i, categoria in enumerate(categorias_seleccionadas):
+    # Calcular FPR, TPR y AUC para cada categoría
+    fpr[categoria], tpr[categoria], thresholds = roc_curve(binarizado[:, i], probabilidades[:, i])
+    roc_auc[categoria] = auc(fpr[categoria], tpr[categoria])
+
+    # Graficar la curva ROC
+    plt.scatter(fpr[categoria], tpr[categoria], label=f'ROC {categoria} (AUC = {roc_auc[categoria]:.2f})')
+    print(f"Para la categoría {categoria} se usaron {len(thresholds)} umbrales")
+plt.show()
+
+"""
 # Crear la matriz de confusión
 etiquetas = categorias_seleccionadas
 matriz_confusion = confusion_matrix(prueba['categoria'], prueba['prediccion'], labels=etiquetas)
@@ -217,7 +246,6 @@ roc_auc = dict()
 for i in range(len(etiquetas)):
     fpr[i], tpr[i], _ = roc_curve(categorias_binarizadas[:, i], predicciones_binarizadas[:, i])
     roc_auc[i] = auc(fpr[i], tpr[i])
-    print(f"Para la categoría {categoria} se usaron {len(_)} umbrales")
 
 # Graficar la curva ROC para cada categoría y guardarla como imagen
 plt.figure(figsize=(10, 8))
@@ -233,63 +261,4 @@ plt.title('Curva ROC para cada categoría', fontsize=16)
 plt.legend(loc='lower right', fontsize=10)
 plt.savefig('curva_roc2.png', bbox_inches='tight')
 plt.close()
-
-
-"""
-from collections import defaultdict
-
-# Inicializar listas y diccionarios
-palabra_repetidas_por_categoria=[[] for e in range(len(categorias_seleccionadas))]
-palabras_por_categoria = defaultdict(set)  # Usaremos un set para almacenar palabras por categoría
-palabras_repetidas_en_categorias = defaultdict(list)  # Diccionario para almacenar palabras repetidas
-
-# Obtener palabras más comunes por cada categoría
-for i, categoria in enumerate(categorias_seleccionadas):
-    df_cat_1 = df_filtrado[df_filtrado["categoria"] == categoria]
-    todos_los_titulares = " ".join(df_cat_1['titular'])
-    texto_min = todos_los_titulares.lower()
-    palabras = texto_min.split()
-    palabras_filtradas = [palabra for palabra in palabras if palabra not in stop_words and len(palabra) > 1]
-
-    # Contar las palabras más comunes
-    contador_palabras = Counter(palabras_filtradas)
-
-    # Obtener las 20 palabras más comunes
-    palabras_comunes = contador_palabras.most_common(40)
-
-    # Guardar las palabras para análisis
-    print(f"Categoria: {categoria}")
-    for palabra, frecuencia in palabras_comunes:
-        print(f'{palabra}: {frecuencia}')
-        palabra_repetidas_por_categoria[i].append(palabra)
-        palabras_por_categoria[categoria].add(palabra)  # Guardar en el set de la categoría
-    print()
-
-# Comprobar palabras repetidas en más de una categoría
-todas_las_palabras = set()  # Para almacenar todas las palabras de todas las categorías
-palabras_repetidas = set()  # Para almacenar las palabras repetidas
-
-# Revisar palabras en todas las categorías
-for palabras_set in palabras_por_categoria.values():
-    for palabra in palabras_set:
-        if palabra in todas_las_palabras:
-            palabras_repetidas.add(palabra)
-        else:
-            todas_las_palabras.add(palabra)
-
-# Mostrar palabras repetidas y en qué categorías están
-print("\nPalabras repetidas en más de una categoría:")
-for palabra in palabras_repetidas:
-    categorias_con_palabra = [cat for cat, palabras_set in palabras_por_categoria.items() if palabra in palabras_set]
-    print(f'Palabra: "{palabra}" se repite en las categorías: {", ".join(categorias_con_palabra)}')
-
-# Mostrar palabras exclusivas por categoría
-print("\nPalabras exclusivas por categoría:")
-for categoria, palabras_set in palabras_por_categoria.items():
-    exclusivas = palabras_set - palabras_repetidas
-    print(f'Categoría: {categoria}')
-    for palabra in exclusivas:
-        print(f'Palabra exclusiva: "{palabra}"')
-    print()
-
 """
