@@ -1,4 +1,4 @@
-import numpy as np
+
 import pandas as pd
 from collections import defaultdict, Counter
 print()
@@ -11,7 +11,7 @@ P(A|R,GRE,GPA) = P(R,GRE,GPA|A) * P(A) / P(R,GRE,GPA)
 """
 
 df = pd.read_csv("binary.csv")
-
+print(df)
 df["gre"]=['high' if row >= 500 else 'low' for row in df["gre"]]
 df["gpa"]=['high' if row >= 3 else 'low' for row in df["gpa"]]
 
@@ -64,14 +64,15 @@ for r in rank:
             total = sum(admit_rgg[a][gre][gpa][r] for a in A)     
             if total > 0:  
                 for a in A:
-                    admit_rgg[a][gre][gpa][r] = admit_rgg[a][gre][gpa][r] / total
-                    print(f"P(A={a}|GRE={gre},GPA={gpa},rank={r}={admit_rgg[a][gre][gpa][r]})")
-                    filtro = (df['gre'] == gre) & (df['gpa'] == gpa) & (df['rank'] == r) & (df['admit'] == a)
-                    conteo = df[filtro].shape[0]
-                    count+=conteo
-                    filtro = (df['gre'] == gre) & (df['gpa'] == gpa) & (df['rank'] == r)
-                    conteo2 = df[filtro].shape[0]
-                    print(f"Hay {conteo} registros de {conteo2} que cumplen con los valores especificados")
+                    if total!=0:
+                        admit_rgg[a][gre][gpa][r] = admit_rgg[a][gre][gpa][r] / total
+                        print(f"P(A={a}|GRE={gre},GPA={gpa},rank={r})={admit_rgg[a][gre][gpa][r]})")
+                        filtro = (df['gre'] == gre) & (df['gpa'] == gpa) & (df['rank'] == r) & (df['admit'] == a)
+                        conteo = df[filtro].shape[0]
+                        count+=conteo
+                        filtro = (df['gre'] == gre) & (df['gpa'] == gpa) & (df['rank'] == r)
+                        conteo2 = df[filtro].shape[0]
+                        print(f"Hay {conteo} registros de {conteo2} que cumplen con los valores especificados")
 print(f"total={count}")
 
                 
@@ -217,8 +218,8 @@ print()
 r=2
 gpa = "high"
 gre = "low"
-a = 0
-print(f"Probabilidad de que una persona con rank={r}, GPA={gpa} y GRE={gre} no haya sido admitida:")
+a = 1
+print(f"Probabilidad de que una persona con rank={r}, GPA={gpa} y GRE={gre} si haya sido admitida:")
 print(f"P(A,R,GRE,GPA)={calculo_de_probabilidades_conjunta(r,a,gre,gpa)}")
 print(f"P(A|R,GRE,GPA)={admit_rgg[a][gre][gpa][r]}")
 
@@ -228,5 +229,5 @@ filtro = (df['gre'] == gre) & (df['gpa'] == gpa) & (df['rank'] == r)
 conteo2 = df[filtro].shape[0]
 
 # Imprimir el resultado
-print(f"Hay {conteo} registros de {conteo2} que cumplen con los valores especificados y no han sido adminitidos")
+print(f"Hay {conteo} registros de {conteo2} que cumplen con los valores especificados y han sido adminitidos")
 
